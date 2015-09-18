@@ -1,0 +1,297 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+//#include "afxres.h"
+#include <windows.h>
+#define IDC_STATIC -1
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// 日本語 resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_JPN)
+//LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
+#pragma code_page(932)
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 7,0,0,0
+ PRODUCTVERSION 7,0,0,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "041104b0"
+        BEGIN
+            VALUE "FileDescription", "VC_plugin"
+            VALUE "FileVersion", "7.0.0.0"
+            VALUE "InternalName", "VC_plugin"
+            VALUE "LegalCopyright", "Copyright (C) 2002"
+            VALUE "OriginalFilename", "VC_plugin.dll"
+            VALUE "ProductVersion", "7.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x411, 1200
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_SHORTCUT DIALOGEX 0, 0, 222, 177
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "ショートカット"
+FONT 9, "MS UI Gothic", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDC_LIST1,12,12,156,150,LBS_USETABSTOPS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "上へ(&U)",IDC_BUTTON1,174,18,42,14
+    PUSHBUTTON      "下へ(&D)",IDC_BUTTON2,174,42,42,14
+    PUSHBUTTON      "編集(&E)",IDC_BUTTON4,174,78,42,14
+    PUSHBUTTON      "削除(&R)",IDC_BUTTON5,174,102,42,14
+    PUSHBUTTON      "新規作成(&N)",IDC_BUTTON6,174,138,42,14
+END
+
+IDD_GENERAL DIALOGEX 0, 0, 222, 177
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "全般"
+FONT 9, "MS UI Gothic", 400, 0, 0x1
+BEGIN
+    LTEXT           "履歴数(0～100)",IDC_STATIC,12,12,50,7
+    EDITTEXT        IDC_EDIT2,66,10,30,11,ES_AUTOHSCROLL | ES_NUMBER
+    CONTROL         "",IDC_SPIN3,"msctls_updown32",UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_HOTTRACK,91,10,8,13
+    GROUPBOX        "ダイアログの位置",IDC_STATIC,10,30,201,45
+    CONTROL         "位置を指定する",IDC_RADIO1,"Button",BS_AUTORADIOBUTTON,18,42,59,10
+    CONTROL         "画面の中央",IDC_RADIO2,"Button",BS_AUTORADIOBUTTON,84,42,49,10
+    CONTROL         "指定しない",IDC_RADIO3,"Button",BS_AUTORADIOBUTTON,144,42,46,10
+    LTEXT           "横方向",IDC_STATIC,15,58,22,7
+    EDITTEXT        IDC_EDIT3,41,58,31,11,ES_AUTOHSCROLL | ES_NUMBER
+    CONTROL         "",IDC_SPIN4,"msctls_updown32",UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_HOTTRACK,62,52,8,13
+    LTEXT           "縦方向",IDC_STATIC,82,58,22,7
+    EDITTEXT        IDC_EDIT4,108,58,31,11,ES_AUTOHSCROLL | ES_NUMBER
+    CONTROL         "",IDC_SPIN5,"msctls_updown32",UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_HOTTRACK,129,52,8,13
+    PUSHBUTTON      "現在の値を設定",IDC_BUTTON2,149,58,53,13
+    GROUPBOX        "リストビューのサイズ",IDC_STATIC,10,86,201,45
+    CONTROL         "リストビューのサイズを指定する",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,97,94,9
+    LTEXT           "横方向",IDC_STATIC,15,113,22,7
+    EDITTEXT        IDC_EDIT5,41,113,31,11,ES_AUTOHSCROLL | ES_NUMBER
+    CONTROL         "",IDC_SPIN6,"msctls_updown32",UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_HOTTRACK,62,113,8,13
+    LTEXT           "縦方向",IDC_STATIC,82,113,22,7
+    EDITTEXT        IDC_EDIT6,108,113,31,11,ES_AUTOHSCROLL | ES_NUMBER
+    CONTROL         "",IDC_SPIN7,"msctls_updown32",UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_HOTTRACK,129,113,8,13
+    PUSHBUTTON      "現在の値を設定",IDC_BUTTON3,149,113,53,13
+    LTEXT           "表示",IDC_STATIC,26,135,15,7
+    COMBOBOX        IDC_COMBO1,26,147,67,66,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "整列",IDC_STATIC,123,135,15,7
+    COMBOBOX        IDC_COMBO2,118,147,67,66,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "ツールバーにボタンを追加する\n(次に開いたダイアログから有効)",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP,108,6,108,18
+END
+
+IDD_EDITSHORTCUT DIALOGEX 0, 0, 226, 58
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+FONT 9, "MS UI Gothic", 400, 0, 0x1
+BEGIN
+    LTEXT           "名前",IDC_STATIC,6,6,17,8
+    EDITTEXT        IDC_EDIT1,24,6,174,14,ES_AUTOHSCROLL
+    LTEXT           "パス",IDC_STATIC,6,24,14,8
+    EDITTEXT        IDC_EDIT2,24,24,174,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON1,204,24,18,14
+    DEFPUSHBUTTON   "OK",IDOK,84,42,50,14
+    PUSHBUTTON      "キャンセル",IDCANCEL,144,42,50,14
+END
+
+IDD_EDITTOOL DIALOGEX 0, 0, 227, 99
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+FONT 9, "MS UI Gothic", 400, 0, 0x1
+BEGIN
+    LTEXT           "名前",IDC_STATIC,6,10,17,8
+    EDITTEXT        IDC_EDIT1,36,6,162,14,ES_AUTOHSCROLL
+    LTEXT           "パス",IDC_STATIC,6,28,14,8
+    EDITTEXT        IDC_EDIT2,36,24,162,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON1,204,24,18,14
+    LTEXT           "パラメータ",IDC_STATIC,6,46,30,8
+    EDITTEXT        IDC_EDIT3,36,42,162,14,ES_AUTOHSCROLL
+    LTEXT           "パラメータで ""%1"" を指定すると、現在表示しているフォルダのパスに置き換えられます。",IDC_STATIC,36,60,162,18
+    DEFPUSHBUTTON   "OK",IDOK,84,78,50,14
+    PUSHBUTTON      "キャンセル",IDCANCEL,144,78,50,14
+END
+
+IDD_TOOL DIALOGEX 0, 0, 222, 177
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "ツール"
+FONT 9, "MS UI Gothic", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDC_LIST1,12,12,156,150,LBS_USETABSTOPS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "上へ(&U)",IDC_BUTTON1,174,18,42,14
+    PUSHBUTTON      "下へ(&D)",IDC_BUTTON2,174,42,42,14
+    PUSHBUTTON      "編集(&E)",IDC_BUTTON4,174,78,42,14
+    PUSHBUTTON      "削除(&R)",IDC_BUTTON5,174,102,42,14
+    PUSHBUTTON      "新規作成(&N)",IDC_BUTTON6,174,138,42,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_SHORTCUT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 215
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 170
+    END
+
+    IDD_GENERAL, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 219
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 172
+    END
+
+    IDD_EDITSHORTCUT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 219
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 51
+    END
+
+    IDD_EDITTOOL, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 220
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 92
+    END
+
+    IDD_TOOL, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 215
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 170
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MENU1 MENU
+BEGIN
+    POPUP "ショートカット(&C)"
+    BEGIN
+        MENUITEM SEPARATOR
+        MENUITEM "現在のフォルダを追加(&A)",              ID_APPEND
+    END
+    POPUP "最近使ったフォルダ(&H)"
+    BEGIN
+        MENUITEM SEPARATOR
+        MENUITEM "最近使ったフォルダをクリア(&C)",           ID_CLEAR
+    END
+    POPUP "ツール(&U)"
+    BEGIN
+        MENUITEM "dummy",                       20000
+    END
+    POPUP "設定(&P)"
+    BEGIN
+        MENUITEM "設定(&P)",                      ID_SETTING
+    END
+END
+
+IDR_MENU2 MENU
+BEGIN
+    POPUP "0"
+    BEGIN
+        POPUP "ショートカット(&C)"
+        BEGIN
+            MENUITEM SEPARATOR
+            MENUITEM "現在のフォルダを追加(&A)",              40005
+        END
+        POPUP "最近使ったフォルダ(&H)"
+        BEGIN
+            MENUITEM SEPARATOR
+            MENUITEM "最近使ったフォルダをクリア(&C)",           40006
+        END
+        POPUP "ツール(&U)"
+        BEGIN
+            MENUITEM "dummy",                       20000
+        END
+        MENUITEM "設定(&P)",                      40004
+    END
+END
+
+#endif    // 日本語 resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

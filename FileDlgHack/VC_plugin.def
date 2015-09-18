@@ -1,0 +1,14 @@
+LIBRARY      "FileDlgHack"
+;DESCRIPTION  'FileDlgHack Windows Dynamic Link Library'
+
+EXPORTS
+    ; 明示的なエクスポートはここへ記述できます
+	TTBEvent_InitPluginInfo		@1
+	TTBEvent_FreePluginInfo		@2
+	TTBEvent_Execute			@3
+	TTBEvent_WindowsHook		@4
+	TTBEvent_Init				@5
+	TTBEvent_Unload				@6 
+
+SECTIONS
+	.SHARED_DATA READ WRITE SHARED
