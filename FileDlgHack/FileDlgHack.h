@@ -75,8 +75,8 @@ typedef struct _SHORTCUTDATA
 {
 	int  count;	
 	struct ShortcutItem {
-		char szName[MAX_PATH];
-		char szPath[MAX_PATH];
+		TCHAR szName[MAX_PATH];
+		TCHAR szPath[MAX_PATH];
 	} data[SHORTCUT_MAX];
 } SHORTCUTDATA;
 
@@ -85,7 +85,7 @@ typedef struct _HISTORYDATA
 	int  count;
 	int  max;
 	struct {
-		char szPath[MAX_PATH];
+		TCHAR szPath[MAX_PATH];
 	} data[HISTORY_MAX];
 } HISTORYDATA;
 
@@ -94,9 +94,9 @@ typedef struct _TOOLDATA
 	int count;
 	int max;
 	struct ToolItem {
-		char szName[MAX_PATH];
-		char szPath[MAX_PATH];
-		char szParam[MAX_PATH];
+		TCHAR szName[MAX_PATH];
+		TCHAR szPath[MAX_PATH];
+		TCHAR szParam[MAX_PATH];
 	} data[TOOL_MAX];
 } TOOLDATA;
 
@@ -110,7 +110,7 @@ typedef struct _SHAREDDATA
 	int          ListStyle;           // 表示
 	int          ListSort;            // アイコンの整理
 	BOOL         bToolbar;            // ツールバーにアイコンを追加するかどうか
-	char         szIniPath[MAX_PATH]; // iniのパス
+	TCHAR        szIniPath[MAX_PATH]; // iniのパス
 	int          cDialog;             // サブクラス化しているダイアログの数
 	SHORTCUTDATA shortcut;            // ショートカットのデータ
 	HISTORYDATA  history;             // 最近使ったフォルダのデータ

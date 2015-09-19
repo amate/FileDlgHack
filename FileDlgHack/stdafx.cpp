@@ -28,17 +28,17 @@ void DebugTrace(const char *str)
 
 #include "FileDlgHack.h"
 
-void LogFilePath(char path[])
+void LogFilePath(TCHAR* path)
 {
-	static char LogPath[MAX_PATH] = "\0";
-	if (LogPath[0] == '\0') {
-		strcpy(LogPath, g_Shared->szIniPath);
-		int len = strlen(LogPath);
-	 	LogPath[len - 3] = 'l';
-	 	LogPath[len - 2] = 'o';
-		LogPath[len - 1] = 'g';
+	static TCHAR LogPath[MAX_PATH] = L"\0";
+	if (LogPath[0] == L'\0') {
+		lstrcpy(LogPath, g_Shared->szIniPath);
+		int len = lstrlen(LogPath);
+	 	LogPath[len - 3] = L'l';
+	 	LogPath[len - 2] = L'o';
+		LogPath[len - 1] = L'g';
 	}
-	strcpy(path, LogPath); 
+	lstrcpy(path, LogPath); 
 }
 
 void DebugTrace(const char *format, ...)
@@ -50,15 +50,15 @@ void DebugTrace(const char *format, ...)
 	wvsprintfA(str, format, list);
 	va_end(list);
 
-	FILE *fp;
-	char LogPath[MAX_PATH];
+	FILE *fp = nullptr;
+	TCHAR LogPath[MAX_PATH];
 	LogFilePath(LogPath);
 	if (::strcmp(str, "open") == 0) {	// 空のファイルを作成する
-		fp = fopen(LogPath, "w");
+		fp = _wfopen(LogPath, L"w");
 		fclose(fp);
 		return ;
 	}
-	fp = fopen(LogPath, "a");
+	fp = _wfopen(LogPath, L"a");
 
 	fputs(str, fp);				// ファイルに書き込み
 

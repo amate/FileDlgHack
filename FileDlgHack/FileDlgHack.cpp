@@ -2,11 +2,13 @@
 //
 
 #include "stdafx.h"
+#include "FileDlgHack.h"
 #include <tchar.h>
+#include <string>
 #include <atlbase.h>
 #include <atlconv.h>
-#include "FileDlgHack.h"
-
+#include <boost\optional.hpp>
+#include <boost\algorithm\string.hpp>
 
 // Set/GetPropで使用
 #define PROP_PROCEDURE "PROP_PROCEDURE" // サブクラス化する前のプロシージャ
@@ -24,6 +26,8 @@ BOOL StrReplace( LPSTR str, LPCSTR szFrom, LPCSTR szTo, int size );
 
 void ExplorerPathToFileDlg();
 
+LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam);
+
 
 #pragma data_seg(".SHARED_DATA")
 HHOOK g_hHook = NULL;					// フックプロシージャのハンドル
@@ -32,6 +36,11 @@ HHOOK g_hHook = NULL;					// フックプロシージャのハンドル
 HINSTANCE   g_Inst		= NULL;			// インスタンスハンドル
 HANDLE      g_hShared	= NULL;
 SHAREDDATA *g_Shared	= NULL;			// 共有メモリ
+
+
+HHOOK g_LLMouseHook = NULL;
+HWND  g_wndToolbar = NULL;
+int	  g_nowPopupIndex = -1;
 
 // --------------------------------------------------------
 
@@ -227,171 +236,123 @@ HWND GetNameEdit( HWND hDlg )
 	return hName;
 }
 
-// ファイルダイアログの現在のフォルダを取得する
-BOOL GetDlgCurDir( HWND hDlgWnd, LPSTR lpbuff )
+/// 現在エクスプローラーで表示中のフォルダのアイテムＩＤリストを作成する
+PIDLIST_ABSOLUTE GetCurIDList(IShellBrowser* pShellBrowser)
 {
-	/*	// こっちでは古いのしか取れない
-	HWND hAddrT;
-	if ((hAddrT = GetAddressBarTxt( hDlgWnd )) != NULL) {
-	// IFileDialog
-	GetWindowText(hAddrT, lpbuff, MAX_PATH);
-	return TRUE;
+	PIDLIST_ABSOLUTE	pidl;
+	HRESULT	hr;
+	CComPtr<IShellView>	pShellView;
+	CComQIPtr<IFolderView>	pFolderView;
+	CComQIPtr<IPersistFolder2>	pPersistFolder2;
+	hr = pShellBrowser->QueryActiveShellView(&pShellView);
+	pFolderView = pShellView;
+	if (hr == S_OK && pFolderView) {
+		hr = pFolderView->GetFolder(IID_IPersistFolder2, (void**)&pPersistFolder2);
+		if (hr == S_OK && pPersistFolder2) {
+			hr = pPersistFolder2->GetCurFolder(&pidl);
+			if (hr == S_OK) {
+				return pidl;
+			}
+		}
 	}
-	*/
 
-	// IFileDlg用
-	HWND hAddrBrd = GetAddressBarBread( hDlgWnd );
-	if (hAddrBrd != NULL) {
-		char strtemp[MAX_PATH];
-		GetWindowTextA(hAddrBrd, strtemp, MAX_PATH);
-		lstrcpyA(lpbuff, &strtemp[10]);		// "アドレス: "の部分を取り除く
-		return TRUE;
+	return NULL;
+}
+
+/// アイテムＩＤリストからフルパスを返す
+std::wstring	GetFullPathFromIDList(PCIDLIST_ABSOLUTE pidl)
+{
+	PWSTR	strFullPath;
+	std::wstring FullPath;
+	if (::SHGetNameFromIDList(pidl, SIGDN_DESKTOPABSOLUTEPARSING, &strFullPath) == S_OK) {
+		FullPath = strFullPath;
+		::CoTaskMemFree(strFullPath);
+	} else {
+		ATLASSERT(FALSE);
+	}
+	return FullPath;
+}
+
+
+/// フルパスからアイテムIDリストを作成する
+/// 作成したアイテムIDリストはちゃんと解放すること！
+PIDLIST_ABSOLUTE CreateIDListFromFullPath(LPCTSTR strFullPath)
+{
+	LPITEMIDLIST pidl;
+	if (::SHILCreateFromPath(strFullPath, &pidl, NULL) == S_OK) {
+		return pidl;
+	}
+	return NULL;
+}
+
+/// ファイルダイアログの現在のフォルダを取得する
+boost::optional<std::wstring>	GetDlgCurrentFolder(HWND hDlgWnd)
+{
+	IShellBrowser* shellBrowser = (IShellBrowser*)::SendMessage(hDlgWnd, WM_USER + 7, 0, 0);
+	if (shellBrowser) {
+		PIDLIST_ABSOLUTE pidl = GetCurIDList(shellBrowser);
+		if (pidl) {
+			std::wstring folderPath = GetFullPathFromIDList(pidl);
+			::ILFree(pidl);
+			return folderPath;
+		}
 	}
 
 	// CDM_GETFOLDERPATH だとUNICODE関係で文字化けすることがあるため CDM_GETFOLDERIDLIST で
-	int size = (int)SendMessage( hDlgWnd, CDM_GETFOLDERIDLIST, 0, NULL );
-	if ( size <= 0 )
-		return FALSE;
-
-	LPITEMIDLIST lpListBuff = (LPITEMIDLIST)CoTaskMemAlloc( size );
-	if ( lpListBuff == NULL )
-		return FALSE;
-
-	LRESULT ret = SendMessage( hDlgWnd, CDM_GETFOLDERIDLIST, size, (LPARAM)lpListBuff );
-	if ( ret <= 0 )
-	{
-		CoTaskMemFree( lpListBuff );
-		return FALSE;
+	int size = (int)SendMessage(hDlgWnd, CDM_GETFOLDERIDLIST, 0, NULL);
+	if (size <= 0) {
+		ATLASSERT(FALSE);
+		return boost::none;
 	}
 
-	BOOL re = SHGetPathFromIDListA( lpListBuff, lpbuff );
-	CoTaskMemFree( lpListBuff );
-	if ( !re )
-		return FALSE;
+	LPITEMIDLIST lpListBuff = (LPITEMIDLIST)CoTaskMemAlloc(size);
+	if (lpListBuff == NULL) {
+		ATLASSERT(FALSE);
+		return boost::none;
+	}
 
-	return TRUE;
+	LRESULT ret = SendMessage(hDlgWnd, CDM_GETFOLDERIDLIST, size, (LPARAM)lpListBuff);
+	if (ret <= 0) {
+		ATLASSERT(FALSE);
+		CoTaskMemFree(lpListBuff);
+		return boost::none;
+	}
+
+	std::wstring folderPath = GetFullPathFromIDList(lpListBuff);
+	return folderPath;
 }
 
-typedef struct {
-	HWND hName;
-	char szBuff[MAX_PATH];
-} ND;
 
-void EditBoxWatch(LPVOID pData)
+/// ファイルダイアログの現在のフォルダを変更する
+bool SetDlgCurrentFolder(HWND hDlgWnd, LPCWSTR folderPath)
 {
-	ND *pND;
-	pND = (ND*)pData;
-	char temp[MAX_PATH] = "";
-	for (int i = 0; i < 20; i++) {	// 無限ループしないために２０回回したら終わり
-		::GetWindowTextA( pND->hName, temp, MAX_PATH);
-		TRACE("ループ%d : %s\n",i, temp);
-		if (temp[0] == '\0') {
-			break;
+	IShellBrowser* shellBrowser = (IShellBrowser*)::SendMessage(hDlgWnd, WM_USER + 7, 0, 0);
+	if (shellBrowser) {
+		LPITEMIDLIST pidlFolder = CreateIDListFromFullPath(folderPath);
+		if (pidlFolder) {
+			if (auto currentFolderPath = GetDlgCurrentFolder(hDlgWnd)) {
+				if (::_wcsicmp(currentFolderPath->c_str(), folderPath) == 0) {
+					::ILFree(pidlFolder);
+					return true;	// 同じフォルダに移動しようとした
+				}
+			}
+			HRESULT hr = shellBrowser->BrowseObject(pidlFolder, SBSP_SAMEBROWSER | SBSP_ABSOLUTE);
+			::ILFree(pidlFolder);
+			if (SUCCEEDED(hr)) {
+				return true;	// 移動に成功！
+			}
 		}
-		Sleep(50);
 	}
-	::SetWindowTextA(pND->hName, pND->szBuff);
-	SendMessage(pND->hName, EM_SETSEL, (WPARAM)0L, (LPARAM)-1L);
-	//SendMessage( pND->hName, WM_SETTEXT, 0, (LPARAM)(LPWSTR)ATL::CA2W(pND->szBuff) );
 
-	delete pND;
-	_endthread();
+	ATLASSERT(FALSE);
+	return false;
 }
-
-// ファイルダイアログの現在のフォルダを変更する
-BOOL SetDlgCurDir( HWND hDlg, LPCSTR lpdir )
-{
-	char currentFolderPath[MAX_PATH] = "";
-	GetDlgCurDir(hDlg, currentFolderPath);
-	if (::lstrcmpiA(lpdir, currentFolderPath) == 0)
-		return TRUE;
-
-	//HWND hAddrT = GetAddressBarTxt( hDlg );
-	//HWND hAddrB = GetAddressBarBtn( hDlg );
-	//HWND hAddrBrd = GetAddressBarBread( hDlg );
-	HWND hAddBrd = GetAddressBarBread(hDlg);
-
-#if 0
-	if( hAddrT != NULL && hAddrB != NULL ) {
-		// IFileDialog
-		if(hAddrBrd != NULL){
-			// Breadcrumb状態を解除
-			SendMessage(hAddrBrd,WM_SETFOCUS,0,0);
-			SendMessage(hAddrBrd,WM_KEYDOWN,VK_RETURN,0);
-			SendMessage(hAddrBrd,WM_KEYUP,VK_RETURN,0);
-		}
-
-		SendMessage(hAddrT,WM_SETTEXT,0,(LPARAM)(LPWSTR)ATL::CA2W(lpdir));
-
-		SendMessage(hAddrB,WM_SETFOCUS,0,0);
-		SendMessage(hAddrB,WM_KEYDOWN,VK_RETURN,0);
-		SendMessage(hAddrB,WM_KEYUP,VK_RETURN,0);
-		return TRUE;
-	}
-	if (hAddrBrd != NULL && hAddrB != NULL) {
-		// Breadcrumb状態を解除
-		SendMessage(hAddrBrd,WM_SETFOCUS,0,0);
-		SendMessage(hAddrBrd,WM_KEYDOWN,VK_RETURN,0);
-		SendMessage(hAddrBrd,WM_KEYUP,VK_RETURN,0);
-
-		HWND hAddrT = GetAddressBarTxt( hDlg );
-		if (hAddrT == NULL) {
-			TRACE("SetDlgCurDir に失敗？\n");
-		}
-		SendMessage(hAddrT,WM_SETTEXT,0,(LPARAM)(LPWSTR)ATL::CA2W(lpdir));
-
-		SendMessage(hAddrB,WM_SETFOCUS,0,0);
-		SendMessage(hAddrB,WM_KEYDOWN,VK_RETURN,0);
-		SendMessage(hAddrB,WM_KEYUP,VK_RETURN,0);
-		return TRUE;
-	}
-#endif
-
-	TCHAR szBuff[MAX_PATH];
-	TCHAR szDir[MAX_PATH];
-
-	lstrcpy( szDir, (LPWSTR)ATL::CA2W(lpdir) );
-	PathAddBackslash( szDir );
-
-	HWND hName = GetNameEdit( hDlg );
-	if (hName == NULL)
-		return FALSE;
-
-	HWND hListView = FindWindowExA( GetDefView( hDlg ), NULL, "SysListView32", NULL );
-
-	if( hListView != NULL )// リストビューの選択を解除
-		ListView_SetItemState( hListView, -1, 0 ,LVIS_SELECTED );
-
-	//SendMessage( hName, WM_GETTEXT, MAX_PATH, (LPARAM)szBuff );
-	//SendMessage( hName, WM_SETTEXT, 0, (LPARAM)szDir );
-	::GetWindowTextW(hName, szBuff, MAX_PATH);
-	HWND cmbBox = ::GetParent(hName);
-	SendMessage(cmbBox, CB_SETCURSEL, -1, 0);
-	::SetWindowTextW(hName, szDir);
-	SendMessage( hDlg, WM_COMMAND, MAKELONG(IDOK, BN_CLICKED), 0 );
-	
-	WCHAR title[MAX_PATH] = L"";
-	::GetWindowText(hDlg, title, MAX_PATH);
-	const int titleLen = ::lstrlen(title);
-	if (titleLen > 2) {
-		if (::lstrcmp(title + (titleLen - 2), L"開く") == 0)
-			return TRUE;
-	}
-
-	ND *pND = new ND;
-	pND->hName = hName;
-	lstrcpyA(pND->szBuff, (LPSTR)ATL::CW2A(szBuff));
-	_beginthread(EditBoxWatch, 0, pND);
-
-	return TRUE;
-}
-
 
 // 設定に応じてダイアログの位置を調整
 void AdjustWinPos( HWND hWnd )
 {
 	RECT Wndrc, Listrc, Deskrc;
-	POINT Pos, Size;
+	POINT Pos = {}, Size = {};
 	int flag = SWP_NOZORDER;
 	HWND hDefView = GetDefView( hWnd );
 
@@ -522,6 +483,10 @@ BOOL InitFileDialog( HWND hWnd )
 		// 新しいファイルダイアログの場合
 		CreateExToolBar(hWnd);
 
+		ATLASSERT(g_LLMouseHook == NULL);
+		g_LLMouseHook = ::SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, g_Inst, 0);
+		ATLASSERT(g_LLMouseHook);
+
 	} else {
 		// 従来のダイアログの場合
 
@@ -533,26 +498,6 @@ BOOL InitFileDialog( HWND hWnd )
 
 			// コントロールがはみ出さないように調整
 			if( GetWindowLongX( hWnd, GWL_STYLE ) & WS_THICKFRAME ) {
-				/*
-				RECT rc;
-				GetWindowRect( hWnd, &rc );
-				// ダイアログを開くたびに少しづつ大きくなるのを防ぐために、少し小さくしておく
-				SetWindowPos( hWnd, NULL, 0, 0,
-				rc.right - rc.left, rc.bottom - rc.top - GetSystemMetrics( SM_CYMENU ),
-				SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER );
-
-				std::pair< std::map< HWND, RECT >, BOOL > p;
-				p.second = TRUE;
-				EnumChildWindows( hWnd, EnumChildProc, (LPARAM)&p );
-
-				GetWindowRect( hWnd, &rc );
-				SetWindowPos( hWnd, NULL, 0, 0,
-				rc.right - rc.left, rc.bottom - rc.top + GetSystemMetrics( SM_CYMENU ),
-				SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSENDCHANGING | SWP_NOZORDER );
-
-				p.second = FALSE;
-				EnumChildWindows( hWnd, EnumChildProc, (LPARAM)&p );
-				*/
 
 			} else {
 				RECT rc;
@@ -606,6 +551,36 @@ BOOL InitFileDialog( HWND hWnd )
 
 #if 1
 	if (!(::GetAsyncKeyState(VK_CONTROL) < 0)) {
+
+		::CoInitialize(NULL);
+		{
+			CComPtr<IShellWindows> spShellWindows;
+			HRESULT hr = ::CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_ALL, IID_IShellWindows, (void**)&spShellWindows);
+
+			long count = 0;
+			spShellWindows->get_Count(&count);
+			for (long i = 0; i < count; ++i) {
+				CComVariant vIndex(i);
+				CComPtr<IDispatch> spDisp;
+				hr = spShellWindows->Item(vIndex, &spDisp);
+				if (hr == S_OK) {
+					CComPtr<IShellBrowser> spShellBrowser;
+					hr = IUnknown_QueryService(spDisp, SID_STopLevelBrowser, IID_IShellBrowser, (void**)&spShellBrowser);
+					if (SUCCEEDED(hr)) {
+						LPITEMIDLIST pidl = GetCurIDList(spShellBrowser);
+						if (pidl) {
+							std::wstring folderPath = GetFullPathFromIDList(pidl);
+							::ILFree(pidl);
+
+							SetDlgCurrentFolder(hWnd, folderPath.c_str());
+							break;
+						}
+					}
+				}
+			}
+		}
+		::CoUninitialize();
+#if 0
 		//ExplorerPathToFileDlg();
 		IShellBrowser* shellBrowser = (IShellBrowser*)::SendMessage(hWnd, WM_USER + 7, 0, 0);
 		if (shellBrowser) {
@@ -615,158 +590,72 @@ BOOL InitFileDialog( HWND hWnd )
 			hr = shellBrowser->BrowseObject(pidl, SBSP_SAMEBROWSER | SBSP_ABSOLUTE);
 			::ILFree(pidl);
 		}
+#endif
 	}
 #endif
 	return TRUE;
 }
 
-/*
-// ファイルダイアログの初期化
-BOOL InitFileDialog( HWND hWnd )
-{
-// サブクラス化
-WNDPROC DefWndProc = (WNDPROC)SetWindowLongX( hWnd, GWL_WNDPROC, (LONG)WndProc );
-SetProp( hWnd, PROP_PROCEDURE, DefWndProc );
-
-if( !g_Shared->bToolbar ) {
-// メニューをセット
-//      SetMenu(hWnd, LoadMenu( g_Inst, MAKEINTRESOURCE( IDR_MENU1 ) ) );
-HWND hWndChild = GetDirectUIHWND(hWnd);
-SetMenu(hWndChild,  LoadMenu( g_Inst, MAKEINTRESOURCE( IDR_MENU1 ) ));
-// コントロールがはみ出さないように調整
-if( GetWindowLongX( hWnd, GWL_STYLE ) & WS_THICKFRAME ) {
-RECT rc;
-GetWindowRect( hWnd, &rc );
-// ダイアログを開くたびに少しづつ大きくなるのを防ぐために、少し小さくしておく
-SetWindowPos( hWnd, NULL, 0, 0,
-rc.right - rc.left, rc.bottom - rc.top - GetSystemMetrics( SM_CYMENU ),
-SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER );
-
-std::pair< std::map< HWND, RECT >, BOOL > p;
-p.second = TRUE;
-EnumChildWindows( hWnd, EnumChildProc, (LPARAM)&p );
-
-GetWindowRect( hWnd, &rc );
-SetWindowPos( hWnd, NULL, 0, 0,
-rc.right - rc.left, rc.bottom - rc.top + GetSystemMetrics( SM_CYMENU ),
-SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSENDCHANGING | SWP_NOZORDER );
-
-p.second = FALSE;
-EnumChildWindows( hWnd, EnumChildProc, (LPARAM)&p );
-
-} else {
-RECT rc;
-GetWindowRect( hWnd, &rc );
-SetWindowPos( hWnd, NULL, 0, 0,
-rc.right - rc.left, rc.bottom - rc.top + GetSystemMetrics( SM_CYMENU ),
-SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSENDCHANGING | SWP_NOZORDER );
-}
-} else {
-// ツールバーにボタンを追加
-RECT rc;
-HWND hToolbar = GetToolbar( hWnd );
-TBBUTTON TBA[] = {
-{ 0, 0, TBSTATE_ENABLED, TBSTYLE_SEP, 0, 0 },
-{ HIST_FAVORITES, TB_BUTTONID, TBSTATE_ENABLED, BTNS_WHOLEDROPDOWN, 0, 0, 0 }
-};
-TOOLINFO ti = { sizeof(TOOLINFO), TTF_SUBCLASS, hToolbar };
-HWND hTooltip = (HWND)SendMessage( hToolbar, TB_GETTOOLTIPS , 0, 0 );
-
-TBA[1].iBitmap += SendMessage( hToolbar, TB_LOADIMAGES, IDB_HIST_SMALL_COLOR, (LPARAM)HINST_COMMCTRL );
-
-int btncnt = SendMessage( hToolbar, TB_BUTTONCOUNT, 0, 0 );
-for( int i = 0; i < sizeof( TBA ) / sizeof( TBA[0] ); i++ )
-SendMessage( hToolbar, TB_INSERTBUTTON, btncnt++, (LPARAM)&TBA[i] );
-
-SendMessage( hToolbar, TB_GETITEMRECT, btncnt - 1, (LPARAM)&ti.rect);
-ti.uId = TB_BUTTONID;
-ti.lpszText = "ファイルダイアログ拡張(ALT+M)";
-SendMessage( hTooltip, TTM_ADDTOOL, 0, (LPARAM)&ti );
-
-// ツールバーのサイズ調整
-SendMessage( hToolbar, TB_GETITEMRECT, btncnt - 1, (LPARAM)&rc );
-SetWindowPos( hToolbar, 0, 0, 0,
-rc.right, rc.bottom, SWP_NOMOVE | SWP_NOOWNERZORDER );
-}
-
-// 位置、サイズ調整
-AdjustWinPos( hWnd );
-
-// 表示を設定
-HWND hDefView = GetDefView( hWnd );
-if( g_Shared->ListStyle )
-SendMessage( hDefView, WM_COMMAND, g_Shared->ListStyle, 0 );
-// ソートする項目を設定
-if( g_Shared->ListSort )
-SendMessage( hDefView, WM_COMMAND, g_Shared->ListSort, 0 );
-
-g_Shared->cDialog++;
-
-return TRUE;
-}
-*/
-
-
 // 現在開いているフォルダをショートカットに追加する
-BOOL AppendShortcut( LPCSTR pszPath, HWND hWnd )
+BOOL AppendShortcut( LPCTSTR pszPath, HWND hWnd )
 {
-	char szName[80];
-	PathCompactPathExA( szName, pszPath, 64, 0 );
+	TCHAR szName[80];
+	PathCompactPathEx( szName, pszPath, 64, 0 );
 	if( g_Shared->shortcut.count < SHORTCUT_MAX )
 	{
-		lstrcpyA( g_Shared->shortcut.data[g_Shared->shortcut.count].szName, szName );
-		lstrcpyA( g_Shared->shortcut.data[g_Shared->shortcut.count].szPath, pszPath );
+		lstrcpy( g_Shared->shortcut.data[g_Shared->shortcut.count].szName, szName );
+		lstrcpy( g_Shared->shortcut.data[g_Shared->shortcut.count].szPath, pszPath );
 		g_Shared->shortcut.count++;
 
 		// iniにも書き込む
-		char szKey[32];
-		wsprintfA( szKey, "Name%d", g_Shared->shortcut.count - 1 );
-		WritePrivateProfileStringA( "Shortcut", szKey, szName, g_Shared->szIniPath );
-		wsprintfA( szKey, "Path%d", g_Shared->shortcut.count - 1 );
-		WritePrivateProfileStringA( "Shortcut", szKey, pszPath, g_Shared->szIniPath );
+		TCHAR szKey[32];
+		wsprintf( szKey, L"Name%d", g_Shared->shortcut.count - 1 );
+		WritePrivateProfileString( L"Shortcut", szKey, szName, g_Shared->szIniPath );
+		wsprintf( szKey, L"Path%d", g_Shared->shortcut.count - 1 );
+		WritePrivateProfileString( L"Shortcut", szKey, pszPath, g_Shared->szIniPath );
 	}
 	else
 	{
-		wsprintfA( szName, "ショートカットは%d個までしか作成できません" , SHORTCUT_MAX );
-		MessageBoxA( hWnd, szName, nullptr, 0 );
+		wsprintf( szName, L"ショートカットは%d個までしか作成できません" , SHORTCUT_MAX );
+		MessageBox( hWnd, szName, nullptr, 0 );
 		return FALSE;
 	}
 	return TRUE;
 }
 
 // 履歴に追加
-BOOL AppendHistory( LPCSTR pszPath )
+BOOL AppendHistory( LPCTSTR pszPath )
 {
 	// データを一つ後ろにずらす
 	int i;
 	for( i = 0; i < g_Shared->history.count; i++ )
-		if( lstrcmpA( g_Shared->history.data[i].szPath, pszPath ) == 0 )
+		if( lstrcmp( g_Shared->history.data[i].szPath, pszPath ) == 0 )
 			break;
 	if( i == g_Shared->history.count && g_Shared->history.count < g_Shared->history.max )
 		g_Shared->history.count++;
 	if( i == g_Shared->history.max )
 		i--;
 	for( ; i > 0; i-- )
-		lstrcpyA( g_Shared->history.data[i].szPath, g_Shared->history.data[i - 1].szPath );
+		lstrcpy( g_Shared->history.data[i].szPath, g_Shared->history.data[i - 1].szPath );
 
 	// 履歴の先頭にに追加
-	lstrcpyA( g_Shared->history.data[0].szPath, pszPath );
+	lstrcpy( g_Shared->history.data[0].szPath, pszPath );
 
 	return TRUE;
 }
 
 // iniファイルからショートカットを読み込む
-BOOL LoadShortcut( LPCSTR szIni )
+BOOL LoadShortcut( LPCTSTR szIni )
 {
-	char szKey[32];
+	TCHAR szKey[32];
 	for( int i = 0; i < SHORTCUT_MAX; i++ )
 	{
-		wsprintfA( szKey, "Name%d", i );
-		GetPrivateProfileStringA( "Shortcut", szKey, "none", g_Shared->shortcut.data[i].szName, MAX_PATH, szIni );
-		if( lstrcmpA( g_Shared->shortcut.data[i].szName, "none" ) == 0 )
+		wsprintf( szKey, L"Name%d", i );
+		GetPrivateProfileString( L"Shortcut", szKey, L"none", g_Shared->shortcut.data[i].szName, MAX_PATH, szIni );
+		if( lstrcmp( g_Shared->shortcut.data[i].szName, L"none" ) == 0 )
 			break;
-		wsprintfA( szKey, "Path%d", i );
-		GetPrivateProfileStringA( "Shortcut", szKey, "", g_Shared->shortcut.data[i].szPath, MAX_PATH, szIni );
+		wsprintf( szKey, L"Path%d", i );
+		GetPrivateProfileString( L"Shortcut", szKey, L"", g_Shared->shortcut.data[i].szPath, MAX_PATH, szIni );
 		g_Shared->shortcut.count++;
 	}
 
@@ -774,14 +663,14 @@ BOOL LoadShortcut( LPCSTR szIni )
 }
 
 // ini ファイルから履歴を読み込む
-BOOL LoadHistory( LPCSTR szIni )
+BOOL LoadHistory( LPCTSTR szIni )
 {
-	char szKey[32];
+	TCHAR szKey[32];
 	for( int i = 0; i < HISTORY_MAX; i++ )
 	{
-		wsprintfA( szKey, "hist%d", i );
-		GetPrivateProfileStringA( "History", szKey, "none", g_Shared->history.data[i].szPath, MAX_PATH, szIni );
-		if( lstrcmpA( g_Shared->history.data[i].szPath, "none" ) == 0 )
+		wsprintf( szKey, L"hist%d", i );
+		GetPrivateProfileString( L"History", szKey, L"none", g_Shared->history.data[i].szPath, MAX_PATH, szIni );
+		if( lstrcmp( g_Shared->history.data[i].szPath, L"none" ) == 0 )
 			break;
 		g_Shared->history.count++;
 	}
@@ -790,19 +679,19 @@ BOOL LoadHistory( LPCSTR szIni )
 }
 
 // iniファイルからツールを読み込む
-BOOL LoadTool( LPCSTR szIni )
+BOOL LoadTool( LPCTSTR szIni )
 {
-	char szKey[32];
+	TCHAR szKey[32];
 	for( int i = 0; i < TOOL_MAX; i++ )
 	{
-		wsprintfA( szKey, "Name%d", i );
-		GetPrivateProfileStringA( "Tool", szKey, "none", g_Shared->tool.data[i].szName, MAX_PATH, szIni );
-		if( lstrcmpA( g_Shared->tool.data[i].szName, "none" ) == 0 )
+		wsprintf( szKey, L"Name%d", i );
+		GetPrivateProfileString( L"Tool", szKey, L"none", g_Shared->tool.data[i].szName, MAX_PATH, szIni );
+		if( lstrcmp( g_Shared->tool.data[i].szName, L"none" ) == 0 )
 			break;
-		wsprintfA( szKey, "Path%d", i );
-		GetPrivateProfileStringA( "Tool", szKey, "", g_Shared->tool.data[i].szPath, MAX_PATH, szIni );
-		wsprintfA( szKey, "Param%d", i );
-		GetPrivateProfileStringA( "Tool", szKey, "", g_Shared->tool.data[i].szParam, MAX_PATH, szIni );
+		wsprintf( szKey, L"Path%d", i );
+		GetPrivateProfileString( L"Tool", szKey, L"", g_Shared->tool.data[i].szPath, MAX_PATH, szIni );
+		wsprintf( szKey, L"Param%d", i );
+		GetPrivateProfileString( L"Tool", szKey, L"", g_Shared->tool.data[i].szParam, MAX_PATH, szIni );
 		g_Shared->tool.count++;
 	}
 
@@ -810,14 +699,14 @@ BOOL LoadTool( LPCSTR szIni )
 }
 
 // ini ファイルに履歴を保存
-BOOL SaveHistory( LPCSTR szIni )
+BOOL SaveHistory( LPCTSTR szIni )
 {
-	WritePrivateProfileSectionA( "History", "\0\0", szIni );
-	char szKey[32];
+	WritePrivateProfileSection( L"History", L"\0\0", szIni );
+	TCHAR szKey[32];
 	for( int i = 0; i < g_Shared->history.count; i++ )
 	{
-		wsprintfA( szKey, "hist%d", i );
-		WritePrivateProfileStringA( "History", szKey, g_Shared->history.data[i].szPath, szIni );
+		wsprintf( szKey, L"hist%d", i );
+		WritePrivateProfileString( L"History", szKey, g_Shared->history.data[i].szPath, szIni );
 	}
 
 	return TRUE;
@@ -838,7 +727,7 @@ BOOL InitMenu( HMENU hMenu )
 		DeleteMenu( hShortcutMenu, 0, MF_BYPOSITION );
 
 	for( int i = 0; i < g_Shared->shortcut.count; i++ )
-		InsertMenuA( hShortcutMenu, i, MF_BYPOSITION | MF_STRING | MF_ENABLED,
+		InsertMenu( hShortcutMenu, i, MF_BYPOSITION | MF_STRING | MF_ENABLED,
 		ID_SHORTCUT_FIRST + i, g_Shared->shortcut.data[i].szName );
 
 	// 履歴のメニューを作る
@@ -848,9 +737,9 @@ BOOL InitMenu( HMENU hMenu )
 
 	for( int i = 0; i < g_Shared->history.count; i++ )
 	{
-		char szBuff[MAX_PATH];
-		PathCompactPathExA( szBuff, g_Shared->history.data[i].szPath, 64, 0);
-		InsertMenuA( hHistoryMenu, i, MF_BYPOSITION | MF_STRING | MF_ENABLED,
+		TCHAR szBuff[MAX_PATH];
+		PathCompactPathEx( szBuff, g_Shared->history.data[i].szPath, 64, 0);
+		InsertMenu( hHistoryMenu, i, MF_BYPOSITION | MF_STRING | MF_ENABLED,
 			ID_HISTORY_FIRST + i, szBuff );
 	}
 
@@ -860,7 +749,7 @@ BOOL InitMenu( HMENU hMenu )
 		DeleteMenu( hToolMenu, 0, MF_BYPOSITION );
 
 	for( int i = 0; i < g_Shared->tool.count; i++ )
-		InsertMenuA( hToolMenu, i, MF_BYPOSITION | MF_STRING | MF_ENABLED,
+		InsertMenu( hToolMenu, i, MF_BYPOSITION | MF_STRING | MF_ENABLED,
 		ID_TOOL_FIRST + i, g_Shared->tool.data[i].szName );
 
 	return TRUE;
@@ -887,11 +776,6 @@ BOOL PopupMenu( HWND hWnd, HWND hToolbar )
 	return ret;
 }
 
-
-HHOOK g_LLMouseHook = NULL;
-HWND  g_wndToolbar = NULL;
-int	  g_nowPopupIndex = -1;
-
 LRESULT CALLBACK LowLevelMouseProc(
   int nCode,     // フックコード
   WPARAM wParam, // メッセージ識別子
@@ -900,17 +784,25 @@ LRESULT CALLBACK LowLevelMouseProc(
 {
 	if (nCode == HC_ACTION) {
 		if (wParam == WM_MOUSEMOVE) {
-			LPMSLLHOOKSTRUCT pmsllhk = (LPMSLLHOOKSTRUCT)lParam;
-			HWND hWndpt = ::WindowFromPoint(pmsllhk->pt);
-			if (hWndpt == g_wndToolbar) {
-				POINT pt = pmsllhk->pt;
-				::ScreenToClient(g_wndToolbar, &pt);
-				int nIndex = (int)::SendMessage(g_wndToolbar, TB_HITTEST, 0, (LPARAM)&pt);
-				if (0 <= nIndex && nIndex < 3 && g_nowPopupIndex != nIndex) {
-					TRACE("表示するメニューを切り替えます");
-					::EndMenu();
-					g_nowPopupIndex = nIndex;
-					::PostMessage(::GetParent(g_wndToolbar), WM_COMMAND, ID_SHORTCUT + nIndex, 1);
+			if (g_nowPopupIndex != -1) {
+				LPMSLLHOOKSTRUCT pmsllhk = (LPMSLLHOOKSTRUCT)lParam;
+				HWND hWndpt = ::WindowFromPoint(pmsllhk->pt);
+				if (hWndpt == g_wndToolbar) {
+					POINT pt = pmsllhk->pt;
+					::ScreenToClient(g_wndToolbar, &pt);
+					int nIndex = (int)::SendMessage(g_wndToolbar, TB_HITTEST, 0, (LPARAM)&pt);
+					if (0 <= nIndex && nIndex < 3 && g_nowPopupIndex != nIndex) {
+						TRACE("表示するメニューを切り替えます : %d\n", nIndex);
+
+						HWND hMenuWnd = FindWindow(L"#32768", NULL);
+						if (hMenuWnd) {
+							::SendMessage(hMenuWnd, WM_CLOSE, 0, 0);
+						}
+
+						HWND hDlgWnd = ::GetParent(g_wndToolbar);						
+						g_nowPopupIndex = nIndex;
+						::PostMessage(hDlgWnd, WM_COMMAND, ID_SHORTCUT + nIndex, 1);
+					}
 				}
 			}
 		}
@@ -918,6 +810,7 @@ LRESULT CALLBACK LowLevelMouseProc(
 
 	return ::CallNextHookEx(g_LLMouseHook, nCode, wParam, lParam);
 }
+
 
 BOOL PopupMenu( HWND hWnd, HWND hToolbar, int iID )
 {
@@ -936,6 +829,9 @@ BOOL PopupMenu( HWND hWnd, HWND hToolbar, int iID )
 	default:
 		return FALSE;
 	}
+
+	TRACE("PopupMenu index : %d\n", nIndex);
+
 	g_nowPopupIndex = nIndex;
 	TPMPARAMS tpm = { sizeof(TPMPARAMS) };
 	SendMessage( hToolbar, TB_GETRECT, (WPARAM)iID, (LPARAM)&tpm.rcExclude);
@@ -946,8 +842,6 @@ BOOL PopupMenu( HWND hWnd, HWND hToolbar, int iID )
 	InitMenu( hSubMenu );
 	HMENU hSubSubMenu = GetSubMenu( hSubMenu, nIndex );
 
-	HHOOK hHook = ::SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, g_Inst, 0);
-	g_LLMouseHook = hHook;
 	g_wndToolbar = hToolbar;
 
 	::SendMessage(hToolbar, TB_PRESSBUTTON, iID, MAKELPARAM(1, 0));
@@ -955,7 +849,6 @@ BOOL PopupMenu( HWND hWnd, HWND hToolbar, int iID )
 	::SendMessage(hToolbar, TB_PRESSBUTTON, iID, MAKELPARAM(0, 0));
 
 	g_wndToolbar = NULL;
-	::UnhookWindowsHookEx(hHook);
 
 	DestroyMenu( hMenu );
 	if (ret != 0) {
@@ -963,6 +856,7 @@ BOOL PopupMenu( HWND hWnd, HWND hToolbar, int iID )
 	}
 	g_nowPopupIndex = -1;
 
+	TRACE("PopupMenu End\n");
 	return ret;
 }
 
@@ -988,7 +882,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			COPYDATASTRUCT* pcds = (COPYDATASTRUCT*)lParam;
 			if (pcds->dwData == kExOpenDir) {
-				SetDlgCurDir(hWnd, static_cast<LPCSTR>(pcds->lpData));
+				std::wstring path = (LPWSTR)CA2W(static_cast<LPCSTR>(pcds->lpData));
+				SetDlgCurrentFolder(hWnd, path.c_str());
 				return 1;
 			}
 			break;
@@ -996,10 +891,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 	case WM_ACTIVATE:
 		{
+#if 0
 			BOOL bActive = wParam & 0xFFFF;
 			if (bActive && bFirstOpen && !(::GetAsyncKeyState(VK_CONTROL) < 0))
 				ExplorerPathToFileDlg();
 			bFirstOpen = false;
+#endif
 		}
 		break;
 
@@ -1011,45 +908,45 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 			case ID_APPEND:
 				{
-					char szPath[MAX_PATH];
-					if( GetDlgCurDir( hWnd, szPath ) )
-						AppendShortcut( szPath, hWnd );
+					if(auto path = GetDlgCurrentFolder(hWnd) )
+						AppendShortcut(path->c_str(), hWnd );
 				}
 				return 0;
+
 			case ID_CLEAR:
 				g_Shared->history.count = 0;
 				SaveHistory( g_Shared->szIniPath );
 				return 0;
+
 			case ID_SETTING:
 				SettingDialog( hWnd );
 				return 0;
+
 			default:
 				if( ID_SHORTCUT_FIRST <= wID && wID < ID_SHORTCUT_FIRST + SHORTCUT_MAX )
 				{
-					SetDlgCurDir( hWnd, g_Shared->shortcut.data[ wID - ID_SHORTCUT_FIRST ].szPath );
+					SetDlgCurrentFolder( hWnd, g_Shared->shortcut.data[ wID - ID_SHORTCUT_FIRST ].szPath );
 					return 0;
 				}
 				else if( ID_HISTORY_FIRST <= wID && wID < ID_HISTORY_FIRST + HISTORY_MAX )
 				{
-					SetDlgCurDir( hWnd, g_Shared->history.data[ wID - ID_HISTORY_FIRST ].szPath );
+					SetDlgCurrentFolder( hWnd, g_Shared->history.data[ wID - ID_HISTORY_FIRST ].szPath );
 					return 0;
 				}
 				else if( ID_TOOL_FIRST <= wID && wID < ID_TOOL_FIRST + TOOL_MAX )
 				{
-					char szParam[MAX_PATH*2];
-					char szDir[MAX_PATH];
-
-					lstrcpyA( szParam, g_Shared->tool.data[wID - ID_TOOL_FIRST].szParam );
-					if( StrStrA( szParam, "%1" ) != 0 )
+					std::wstring szParam = g_Shared->tool.data[wID - ID_TOOL_FIRST].szParam;
+					if( StrStr( szParam.c_str(), L"%1" ) != 0 )
 					{ // "%1"を含んでいたら現在のフォルダのパスで置換する。
-						if( GetDlgCurDir( hWnd, szDir ) )
-							StrReplace( szParam, "%1", szDir, MAX_PATH*2 );
-						else
+						if (auto path = GetDlgCurrentFolder(hWnd)) {
+							boost::replace_all(szParam, L"%1", *path);
+						} else {
 							return 0;
+						}
 					}
 
-					if( (int)ShellExecuteA( NULL, NULL, g_Shared->tool.data[wID - ID_TOOL_FIRST].szPath,
-						szParam, NULL, SW_SHOWDEFAULT ) <= 32 )
+					if( (int)ShellExecute( NULL, NULL, g_Shared->tool.data[wID - ID_TOOL_FIRST].szPath,
+						szParam.c_str(), NULL, SW_SHOWDEFAULT ) <= 32 )
 						MessageBoxA( hWnd, "実行できません。パスを確認してください。", "エラー", 0 );
 				}
 				break;
@@ -1145,9 +1042,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		// 履歴に追加
 		if( !GetPropA( hWnd, PROP_CANCEL) ) {
 			// キャンセルで終了ではないので履歴を保存
-			char szBuff[MAX_PATH];
-			if( GetDlgCurDir( hWnd, szBuff ) ) {
-				AppendHistory( szBuff );
+			if(auto path = GetDlgCurrentFolder(hWnd) ) {
+				AppendHistory(path->c_str());
 				SaveHistory( g_Shared->szIniPath );
 			}
 		}
@@ -1166,6 +1062,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		//サブクラス化を解除
 		SetWindowLongX( hWnd, GWLP_WNDPROC, (LONG_PTR)DefProc );
+
+		if (g_LLMouseHook) {
+			::UnhookWindowsHookEx(g_LLMouseHook);
+			g_LLMouseHook = NULL;
+		}
 
 		g_Shared->cDialog--;
 
@@ -1216,28 +1117,28 @@ LRESULT CALLBACK CallWndRetProc( int nCode, WPARAM wParam, LPARAM lParam )
 
 BOOL Init(void)
 {
-	int len = GetModuleFileNameA( g_Inst, g_Shared->szIniPath, MAX_PATH);
+	int len = GetModuleFileName( g_Inst, g_Shared->szIniPath, MAX_PATH);
 
-	g_Shared->szIniPath[len - 3] = 'i';
-	g_Shared->szIniPath[len - 2] = 'n';
-	g_Shared->szIniPath[len - 1] = 'i';
+	g_Shared->szIniPath[len - 3] = L'i';
+	g_Shared->szIniPath[len - 2] = L'n';
+	g_Shared->szIniPath[len - 1] = L'i';
 
 	TRACE("open");	// logファイル作成
 
-	g_Shared->nDialogPos    = GetPrivateProfileIntA("Setting", "Pos", FALSE, g_Shared->szIniPath);
-	g_Shared->DialogPos.x   = GetPrivateProfileIntA("Setting", "PosX", 100, g_Shared->szIniPath);
-	g_Shared->DialogPos.y   = GetPrivateProfileIntA("Setting", "PosY", 100, g_Shared->szIniPath);
-	g_Shared->bListSize     = GetPrivateProfileIntA("Setting", "Size", FALSE, g_Shared->szIniPath);
-	g_Shared->ListSize.x    = GetPrivateProfileIntA("Setting", "SizeX", 640, g_Shared->szIniPath);
-	g_Shared->ListSize.y    = GetPrivateProfileIntA("Setting", "SizeY", 480, g_Shared->szIniPath);
-	g_Shared->ListStyle     = GetPrivateProfileIntA("Setting", "ListStyle", 0, g_Shared->szIniPath);
-	g_Shared->ListSort      = GetPrivateProfileIntA("Setting", "ListSort", 0, g_Shared->szIniPath);
-	g_Shared->bToolbar      = GetPrivateProfileIntA("Setting", "Toolbar", 0, g_Shared->szIniPath);
+	g_Shared->nDialogPos    = GetPrivateProfileInt(L"Setting", L"Pos", FALSE, g_Shared->szIniPath);
+	g_Shared->DialogPos.x   = GetPrivateProfileInt(L"Setting", L"PosX", 100, g_Shared->szIniPath);
+	g_Shared->DialogPos.y   = GetPrivateProfileInt(L"Setting", L"PosY", 100, g_Shared->szIniPath);
+	g_Shared->bListSize     = GetPrivateProfileInt(L"Setting", L"Size", FALSE, g_Shared->szIniPath);
+	g_Shared->ListSize.x    = GetPrivateProfileInt(L"Setting", L"SizeX", 640, g_Shared->szIniPath);
+	g_Shared->ListSize.y    = GetPrivateProfileInt(L"Setting", L"SizeY", 480, g_Shared->szIniPath);
+	g_Shared->ListStyle     = GetPrivateProfileInt(L"Setting", L"ListStyle", 0, g_Shared->szIniPath);
+	g_Shared->ListSort      = GetPrivateProfileInt(L"Setting", L"ListSort", 0, g_Shared->szIniPath);
+	g_Shared->bToolbar      = GetPrivateProfileInt(L"Setting", L"Toolbar", 0, g_Shared->szIniPath);
 
 
 	// 履歴
 	g_Shared->history.count = 0;
-	g_Shared->history.max = GetPrivateProfileIntA( "Setting", "MaxHistory", 5, g_Shared->szIniPath);
+	g_Shared->history.max = GetPrivateProfileInt( L"Setting", L"MaxHistory", 5, g_Shared->szIniPath);
 	LoadHistory( g_Shared->szIniPath );
 
 	// ショートカット
@@ -1290,14 +1191,14 @@ BOOL Init(void)
 // --------------------------------------------------------
 void Unload(void)
 {
-#if 0
 	while (g_Shared->cDialog) {
-		int ret = MessageBoxA(NULL, "TTBaseを終了する前にすべてのファイルダイアログを閉じてください",
-			"ファイルダイアログ拡張7", MB_YESNO | MB_ICONEXCLAMATION);
+		TCHAR buf[256] = _T("");
+		wsprintf(buf, _T("TTBaseを終了する前にすべてのファイルダイアログを閉じてください\n\"いいえ\"で強制終了(表示ダイアログ数: %d)"), g_Shared->cDialog);
+		int ret = MessageBox(NULL, buf,
+			L"ファイルダイアログ拡張7", MB_YESNO | MB_ICONEXCLAMATION);
 		if (ret == IDNO)
 			g_Shared->cDialog = 0;
 	}
-#endif
 
 	UnhookWindowsHookEx( g_hHook );
 	g_hHook = NULL;

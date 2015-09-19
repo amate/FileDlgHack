@@ -137,11 +137,11 @@ extern SHAREDDATA *g_Shared;
 extern HINSTANCE  g_Inst;
 
 
-BOOL WritePrivateProfileInt( LPSTR lpAppName, LPSTR lpKeyName, int value, LPSTR lpFileName )
+BOOL WritePrivateProfileInt( LPCTSTR lpAppName, LPCTSTR lpKeyName, int value, LPCTSTR lpFileName )
 {
-	char szbuff[32];
-	wsprintfA( szbuff, "%d", value );
-	return WritePrivateProfileStringA( lpAppName, lpKeyName, szbuff, lpFileName );
+	TCHAR szbuff[32];
+	wsprintf( szbuff, L"%d", value );
+	return WritePrivateProfileString( lpAppName, lpKeyName, szbuff, lpFileName );
 }
 
 // windowsのバージョンを返す
@@ -375,16 +375,16 @@ BOOL CALLBACK PageProcGENERAL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 			AdjustWinPos( hFileDlg );
 
 			//設定ファイルに書き込み
-			WritePrivateProfileInt( "Setting", "Pos"       , g_Shared->nDialogPos , g_Shared->szIniPath );
-			WritePrivateProfileInt( "Setting", "PosX"      , g_Shared->DialogPos.x, g_Shared->szIniPath );
-			WritePrivateProfileInt( "Setting", "PosY"      , g_Shared->DialogPos.y, g_Shared->szIniPath);
-			WritePrivateProfileInt( "Setting", "Size"      , g_Shared->bListSize  , g_Shared->szIniPath);
-			WritePrivateProfileInt( "Setting", "SizeX"     , g_Shared->ListSize.x , g_Shared->szIniPath);
-			WritePrivateProfileInt( "Setting", "SizeY"     , g_Shared->ListSize.y , g_Shared->szIniPath);
-			WritePrivateProfileInt( "Setting", "ListStyle" , g_Shared->ListStyle  , g_Shared->szIniPath);
-			WritePrivateProfileInt( "Setting", "ListSort"  , g_Shared->ListSort   , g_Shared->szIniPath);
-			WritePrivateProfileInt( "Setting", "MaxHistory", g_Shared->history.max , g_Shared->szIniPath);
-			WritePrivateProfileInt( "Setting", "Toolbar"   , g_Shared->bToolbar , g_Shared->szIniPath);
+			WritePrivateProfileInt( L"Setting", L"Pos"       , g_Shared->nDialogPos , g_Shared->szIniPath );
+			WritePrivateProfileInt( L"Setting", L"PosX"      , g_Shared->DialogPos.x, g_Shared->szIniPath );
+			WritePrivateProfileInt( L"Setting", L"PosY"      , g_Shared->DialogPos.y, g_Shared->szIniPath);
+			WritePrivateProfileInt( L"Setting", L"Size"      , g_Shared->bListSize  , g_Shared->szIniPath);
+			WritePrivateProfileInt( L"Setting", L"SizeX"     , g_Shared->ListSize.x , g_Shared->szIniPath);
+			WritePrivateProfileInt( L"Setting", L"SizeY"     , g_Shared->ListSize.y , g_Shared->szIniPath);
+			WritePrivateProfileInt( L"Setting", L"ListStyle" , g_Shared->ListStyle  , g_Shared->szIniPath);
+			WritePrivateProfileInt( L"Setting", L"ListSort"  , g_Shared->ListSort   , g_Shared->szIniPath);
+			WritePrivateProfileInt( L"Setting", L"MaxHistory", g_Shared->history.max , g_Shared->szIniPath);
+			WritePrivateProfileInt( L"Setting", L"Toolbar"   , g_Shared->bToolbar , g_Shared->szIniPath);
 
 			return TRUE;
 		}
@@ -413,7 +413,7 @@ BOOL CALLBACK PageProcSHORTCUT( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 
 			for( int i = 0; i < g_Shared->shortcut.count; i++ )
 			{
-				SendDlgItemMessage( hWnd, IDC_LIST1, LB_ADDSTRING, 0, (LPARAM)(LPWSTR)ATL::CA2W(g_Shared->shortcut.data[i].szName) );
+				SendDlgItemMessage( hWnd, IDC_LIST1, LB_ADDSTRING, 0, (LPARAM)g_Shared->shortcut.data[i].szName );
 				SHORTCUTDATA::ShortcutItem *data = (SHORTCUTDATA::ShortcutItem *)HeapAlloc(
 					GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof( SHORTCUTDATA::ShortcutItem ) );
 				if( data )
@@ -466,7 +466,7 @@ BOOL CALLBACK PageProcSHORTCUT( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 				{
 					SendDlgItemMessage( hWnd, IDC_LIST1, LB_DELETESTRING, index, 0 );
 					index = (int)SendDlgItemMessage( hWnd, IDC_LIST1, LB_INSERTSTRING, index,
-						(LPARAM)(LPWSTR)ATL::CA2W(((SHORTCUTDATA::ShortcutItem*)data)->szName) );
+						(LPARAM)((SHORTCUTDATA::ShortcutItem*)data)->szName );
 					SendDlgItemMessage( hWnd, IDC_LIST1, LB_SETITEMDATA, index, data );
 				}
 				PropSheet_Changed( GetParent( hWnd ), hWnd );
@@ -506,7 +506,7 @@ BOOL CALLBACK PageProcSHORTCUT( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 
 				if( ret == IDOK )
 				{
-					int index = (int)SendDlgItemMessage( hWnd, IDC_LIST1, LB_ADDSTRING, 0, (LPARAM)(LPWSTR)ATL::CA2W(data->szName) );
+					int index = (int)SendDlgItemMessage( hWnd, IDC_LIST1, LB_ADDSTRING, 0, (LPARAM)data->szName );
 					SendDlgItemMessage( hWnd, IDC_LIST1, LB_SETITEMDATA, index, (LPARAM)data );
 					SendDlgItemMessage( hWnd, IDC_LIST1, LB_SETCURSEL, index, 0 );
 					SendMessage( hWnd, WM_COMMAND, MAKEWPARAM( IDC_LIST1, LBN_SELCHANGE ), 0);
@@ -557,14 +557,14 @@ BOOL CALLBACK PageProcSHORTCUT( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 						hWnd, IDC_LIST1, LB_GETITEMDATA, i, 0 );
 
 			//セクションのキーをすべて削除してからiniに書き込む
-			WritePrivateProfileSectionA( "Shortcut", "\0\0", g_Shared->szIniPath );
-			char szKey[32];
+			WritePrivateProfileSection( L"Shortcut", L"\0\0", g_Shared->szIniPath );
+			TCHAR szKey[32];
 			for( int i = 0; i < g_Shared->shortcut.count; i++ )
 			{
-				wsprintfA( szKey, "Name%d", i );
-				WritePrivateProfileStringA( "Shortcut", szKey, g_Shared->shortcut.data[i].szName, g_Shared->szIniPath );
-				wsprintfA( szKey, "Path%d", i );
-				WritePrivateProfileStringA( "Shortcut", szKey, g_Shared->shortcut.data[i].szPath, g_Shared->szIniPath );
+				wsprintf( szKey, L"Name%d", i );
+				WritePrivateProfileString( L"Shortcut", szKey, g_Shared->shortcut.data[i].szName, g_Shared->szIniPath );
+				wsprintf( szKey, L"Path%d", i );
+				WritePrivateProfileString( L"Shortcut", szKey, g_Shared->shortcut.data[i].szPath, g_Shared->szIniPath );
 			}
 		}
 		return TRUE;
@@ -583,20 +583,20 @@ BOOL CALLBACK PageProcSHORTCUT( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 	return FALSE;
 }
 
-BOOL BrowseForFolder( HWND hWnd, LPSTR pStr )
+BOOL BrowseForFolder( HWND hWnd, LPTSTR pStr )
 {
-	BROWSEINFOA bi = { 0 };
-	char szBuff[MAX_PATH];
+	BROWSEINFO bi = { 0 };
+	TCHAR szBuff[MAX_PATH];
 
 	bi.hwndOwner = hWnd;
 	bi.pszDisplayName = szBuff;
-	bi.lpszTitle = "";
+	bi.lpszTitle = L"";
 	bi.ulFlags = BIF_RETURNONLYFSDIRS ;
 
-	LPITEMIDLIST pidl = SHBrowseForFolderA( &bi );
+	LPITEMIDLIST pidl = SHBrowseForFolder( &bi );
 	if( pidl != NULL )
 	{
-		SHGetPathFromIDListA( pidl, pStr );
+		SHGetPathFromIDList( pidl, pStr );
 		CoTaskMemFree( pidl );			
 	}
 	else
@@ -613,8 +613,8 @@ INT_PTR CALLBACK EditShortcutDialogProc( HWND hWnd , UINT msg , WPARAM wp , LPAR
 		{
 			SHORTCUTDATA::ShortcutItem *data = (SHORTCUTDATA::ShortcutItem *)lp;
 			SetWindowLongPtr( hWnd, GWLP_USERDATA, lp );
-			SetDlgItemTextA( hWnd, IDC_EDIT1, data->szName );
-			SetDlgItemTextA( hWnd, IDC_EDIT2, data->szPath );
+			SetDlgItemText( hWnd, IDC_EDIT1, data->szName );
+			SetDlgItemText( hWnd, IDC_EDIT2, data->szPath );
 		}
 		return TRUE;
 	case WM_COMMAND:
@@ -623,8 +623,8 @@ INT_PTR CALLBACK EditShortcutDialogProc( HWND hWnd , UINT msg , WPARAM wp , LPAR
 		case IDOK:
 			{
 				SHORTCUTDATA::ShortcutItem * data = (SHORTCUTDATA::ShortcutItem*)GetWindowLongPtr( hWnd, GWLP_USERDATA );
-				GetDlgItemTextA( hWnd, IDC_EDIT1, data->szName, MAX_PATH );
-				GetDlgItemTextA( hWnd, IDC_EDIT2, data->szPath, MAX_PATH );
+				GetDlgItemText( hWnd, IDC_EDIT1, data->szName, MAX_PATH );
+				GetDlgItemText( hWnd, IDC_EDIT2, data->szPath, MAX_PATH );
 			}
 			EndDialog(hWnd , IDOK);
 			break;
@@ -641,7 +641,7 @@ INT_PTR CALLBACK EditShortcutDialogProc( HWND hWnd , UINT msg , WPARAM wp , LPAR
 				CoUninitialize();
 
 				if( res )
-					SetDlgItemTextA( hWnd, IDC_EDIT2, data->szPath );
+					SetDlgItemText( hWnd, IDC_EDIT2, data->szPath );
 			}
 			break;
 		}
@@ -671,7 +671,7 @@ BOOL CALLBACK PageProcTOOL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 
 			for( int i = 0; i < g_Shared->tool.count; i++ )
 			{
-				SendDlgItemMessage( hWnd, IDC_LIST1, LB_ADDSTRING, 0, (LPARAM)(LPWSTR)ATL::CA2W(g_Shared->tool.data[i].szName) );
+				SendDlgItemMessage( hWnd, IDC_LIST1, LB_ADDSTRING, 0, (LPARAM)g_Shared->tool.data[i].szName );
 				TOOLDATA::ToolItem *data = (TOOLDATA::ToolItem *)HeapAlloc(
 					GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof( TOOLDATA::ToolItem ) );
 				if( data )
@@ -723,7 +723,7 @@ BOOL CALLBACK PageProcTOOL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 				{
 					SendDlgItemMessage( hWnd, IDC_LIST1, LB_DELETESTRING, index, 0 );
 					index = (int)SendDlgItemMessage( hWnd, IDC_LIST1, LB_INSERTSTRING, index,
-						(LPARAM)(LPWSTR)ATL::CA2W(((TOOLDATA::ToolItem*)data)->szName) );
+						(LPARAM)((TOOLDATA::ToolItem*)data)->szName );
 					SendDlgItemMessage( hWnd, IDC_LIST1, LB_SETITEMDATA, index, data );
 				}
 				PropSheet_Changed( GetParent( hWnd ), hWnd );
@@ -763,7 +763,7 @@ BOOL CALLBACK PageProcTOOL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 
 				if( ret == IDOK )
 				{
-					int index = (int)SendDlgItemMessage( hWnd, IDC_LIST1, LB_ADDSTRING, 0, (LPARAM)(LPWSTR)ATL::CA2W(data->szName) );
+					int index = (int)SendDlgItemMessage( hWnd, IDC_LIST1, LB_ADDSTRING, 0, (LPARAM)data->szName );
 					SendDlgItemMessage( hWnd, IDC_LIST1, LB_SETITEMDATA, index, (LPARAM)data );
 					SendDlgItemMessage( hWnd, IDC_LIST1, LB_SETCURSEL, index, 0 );
 					SendMessage( hWnd, WM_COMMAND, MAKEWPARAM( IDC_LIST1, LBN_SELCHANGE ), 0);
@@ -814,16 +814,16 @@ BOOL CALLBACK PageProcTOOL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 						hWnd, IDC_LIST1, LB_GETITEMDATA, i, 0 );
 
 			//セクションのキーをすべて削除してからiniに書き込む
-			WritePrivateProfileSectionA( "Tool", "\0\0", g_Shared->szIniPath );
-			char szKey[32];
+			WritePrivateProfileSection( L"Tool", L"\0\0", g_Shared->szIniPath );
+			TCHAR szKey[32];
 			for( int i = 0; i < g_Shared->tool.count; i++ )
 			{
-				wsprintfA( szKey, "Name%d", i );
-				WritePrivateProfileStringA( "Tool", szKey, g_Shared->tool.data[i].szName, g_Shared->szIniPath );
-				wsprintfA( szKey, "Path%d", i );
-				WritePrivateProfileStringA( "Tool", szKey, g_Shared->tool.data[i].szPath, g_Shared->szIniPath );
-				wsprintfA( szKey, "Param%d", i );
-				WritePrivateProfileStringA( "Tool", szKey, g_Shared->tool.data[i].szParam, g_Shared->szIniPath );
+				wsprintf( szKey, L"Name%d", i );
+				WritePrivateProfileString( L"Tool", szKey, g_Shared->tool.data[i].szName, g_Shared->szIniPath );
+				wsprintf( szKey, L"Path%d", i );
+				WritePrivateProfileString( L"Tool", szKey, g_Shared->tool.data[i].szPath, g_Shared->szIniPath );
+				wsprintf( szKey, L"Param%d", i );
+				WritePrivateProfileString( L"Tool", szKey, g_Shared->tool.data[i].szParam, g_Shared->szIniPath );
 			}
 		}
 		return TRUE;
@@ -843,18 +843,18 @@ BOOL CALLBACK PageProcTOOL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 }
 
 
-BOOL GetFileName( HWND hParent, LPSTR lpBuf, int bufsize )
+BOOL GetFileName( HWND hParent, LPTSTR lpBuf, int bufsize )
 {
-	OPENFILENAMEA ofn = { sizeof(OPENFILENAME) };
-	ZeroMemory( lpBuf, bufsize );
+	OPENFILENAME ofn = { sizeof(OPENFILENAME) };
+	ZeroMemory( lpBuf, bufsize * sizeof(TCHAR) );
 
 	ofn.hwndOwner = hParent;
-	ofn.lpstrFilter = "All files(*.*)\0*.*\0\0";
+	ofn.lpstrFilter = L"All files(*.*)\0*.*\0\0";
 	ofn.lpstrFile = lpBuf;
 	ofn.nMaxFile = bufsize;
 	ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_EXPLORER;
 
-	return GetOpenFileNameA(&ofn);
+	return GetOpenFileName(&ofn);
 }
 
 INT_PTR CALLBACK EditToolDialogProc( HWND hWnd , UINT msg , WPARAM wp , LPARAM lp )
@@ -865,9 +865,9 @@ INT_PTR CALLBACK EditToolDialogProc( HWND hWnd , UINT msg , WPARAM wp , LPARAM l
 		{
 			TOOLDATA::ToolItem *data = (TOOLDATA::ToolItem *)lp;
 			SetWindowLongPtr( hWnd, GWLP_USERDATA, lp );
-			SetDlgItemTextA( hWnd, IDC_EDIT1, data->szName );
-			SetDlgItemTextA( hWnd, IDC_EDIT2, data->szPath );
-			SetDlgItemTextA( hWnd, IDC_EDIT3, data->szParam );
+			SetDlgItemText( hWnd, IDC_EDIT1, data->szName );
+			SetDlgItemText( hWnd, IDC_EDIT2, data->szPath );
+			SetDlgItemText( hWnd, IDC_EDIT3, data->szParam );
 		}
 		return TRUE;
 	case WM_COMMAND:
@@ -876,9 +876,9 @@ INT_PTR CALLBACK EditToolDialogProc( HWND hWnd , UINT msg , WPARAM wp , LPARAM l
 		case IDOK:
 			{
 				TOOLDATA::ToolItem * data = (TOOLDATA::ToolItem*)GetWindowLongPtr( hWnd, GWLP_USERDATA );
-				GetDlgItemTextA( hWnd, IDC_EDIT1, data->szName, MAX_PATH );
-				GetDlgItemTextA( hWnd, IDC_EDIT2, data->szPath, MAX_PATH );
-				GetDlgItemTextA( hWnd, IDC_EDIT3, data->szParam, MAX_PATH );
+				GetDlgItemText( hWnd, IDC_EDIT1, data->szName, MAX_PATH );
+				GetDlgItemText( hWnd, IDC_EDIT2, data->szPath, MAX_PATH );
+				GetDlgItemText( hWnd, IDC_EDIT3, data->szParam, MAX_PATH );
 			}
 			EndDialog(hWnd , IDOK);
 			break;
@@ -889,7 +889,7 @@ INT_PTR CALLBACK EditToolDialogProc( HWND hWnd , UINT msg , WPARAM wp , LPARAM l
 			{
 				TOOLDATA::ToolItem *data = (TOOLDATA::ToolItem*)GetWindowLongPtr( hWnd, GWLP_USERDATA );
 				if( GetFileName( hWnd, data->szPath, MAX_PATH ) )
-					SetDlgItemTextA( hWnd, IDC_EDIT2, data->szPath );
+					SetDlgItemText( hWnd, IDC_EDIT2, data->szPath );
 			}
 			break;
 		}
