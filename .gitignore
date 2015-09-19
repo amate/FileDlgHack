@@ -25,3 +25,6 @@ obj/
 [Rr]elease*/
 _ReSharper*/
 ipch/
+/#Release
+
+

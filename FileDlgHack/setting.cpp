@@ -255,7 +255,9 @@ BOOL CALLBACK PageProcGENERAL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 					SendDlgItemMessage( hWnd, IDC_COMBO2, CB_SETCURSEL, i, 0 );
 			}
 
-
+			if (g_Shared->bExplorerFolderOpenOnActive) {
+				SendDlgItemMessage(hWnd, IDC_CHECK_EXPLORERFOLDEROPENONACTIVE, BM_SETCHECK, BST_CHECKED, 0);
+			}
 		}
 		return TRUE;
 	case WM_COMMAND:
@@ -372,6 +374,8 @@ BOOL CALLBACK PageProcGENERAL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 			g_Shared->ListSize.x  = GetDlgItemInt( hWnd, IDC_EDIT5, NULL, FALSE );
 			g_Shared->ListSize.y  = GetDlgItemInt( hWnd, IDC_EDIT6, NULL, FALSE );
 
+			g_Shared->bExplorerFolderOpenOnActive = (IsDlgButtonChecked(hWnd, IDC_CHECK_EXPLORERFOLDEROPENONACTIVE) == BST_CHECKED);
+
 			AdjustWinPos( hFileDlg );
 
 			//Ý’èƒtƒ@ƒCƒ‹‚É‘‚«ž‚Ý
@@ -385,6 +389,7 @@ BOOL CALLBACK PageProcGENERAL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 			WritePrivateProfileInt( L"Setting", L"ListSort"  , g_Shared->ListSort   , g_Shared->szIniPath);
 			WritePrivateProfileInt( L"Setting", L"MaxHistory", g_Shared->history.max , g_Shared->szIniPath);
 			WritePrivateProfileInt( L"Setting", L"Toolbar"   , g_Shared->bToolbar , g_Shared->szIniPath);
+			WritePrivateProfileInt( L"Setting", L"ExplorerFolderOpenOnActive", g_Shared->bExplorerFolderOpenOnActive, g_Shared->szIniPath);
 
 			return TRUE;
 		}

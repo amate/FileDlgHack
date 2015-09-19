@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
-// Microsoft Visual C++ generated include file.
-// Used by Version.rc
+// Microsoft Visual C++ で生成されたインクルード ファイル。
+// Version.rc で使用
 //
 #define IDD_DIALOG1                     101
 #define IDD_SHORTCUT                    101
@@ -39,25 +39,27 @@
 #define IDC_RADIO1                      1027
 #define IDC_RADIO2                      1028
 #define IDC_RADIO3                      1029
+#define IDC_CHECK3                      1030
+#define IDC_CHECK_EXPLORERFOLDEROPENONACTIVE 1030
 #define ID_SETTING                      40004
 #define ID_APPEND                       40005
 #define ID_CLEAR                        40006
 #define ID_40007                        40007
 #define ID_40009                        40009
 #define ID_Menu                         40010
-#define ID_TOOLBAR						40011
-#define ID_SHORTCUT						40012
-#define ID_HISTORY						40013
-#define ID_TOOL							40014
-#define ID_SETTEI						40015
+#define ID_TOOLBAR                      40011
+#define ID_SHORTCUT                     40012
+#define ID_HISTORY                      40013
+#define ID_TOOL                         40014
+#define ID_SETTEI                       40015
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        107
+#define _APS_NEXT_RESOURCE_VALUE        108
 #define _APS_NEXT_COMMAND_VALUE         40016
-#define _APS_NEXT_CONTROL_VALUE         1030
+#define _APS_NEXT_CONTROL_VALUE         1031
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

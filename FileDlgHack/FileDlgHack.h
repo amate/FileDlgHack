@@ -110,6 +110,7 @@ typedef struct _SHAREDDATA
 	int          ListStyle;           // 表示
 	int          ListSort;            // アイコンの整理
 	BOOL         bToolbar;            // ツールバーにアイコンを追加するかどうか
+	BOOL		 bExplorerFolderOpenOnActive;
 	TCHAR        szIniPath[MAX_PATH]; // iniのパス
 	int          cDialog;             // サブクラス化しているダイアログの数
 	SHORTCUTDATA shortcut;            // ショートカットのデータ

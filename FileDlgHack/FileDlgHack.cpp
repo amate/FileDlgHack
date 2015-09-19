@@ -285,6 +285,46 @@ PIDLIST_ABSOLUTE CreateIDListFromFullPath(LPCTSTR strFullPath)
 	return NULL;
 }
 
+
+///　エクスプローラーで表示中のフォルダのパスを返す
+boost::optional<std::wstring>	GetExplorerFolderPath()
+{
+	auto funcGetExplorerFolder = []() -> boost::optional<std::wstring> 
+	{
+		CComPtr<IShellWindows> spShellWindows;
+		HRESULT hr = ::CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_ALL, IID_IShellWindows, (void**)&spShellWindows);
+		if (spShellWindows) {
+			long count = 0;
+			spShellWindows->get_Count(&count);
+			for (long i = 0; i < count; ++i) {
+				CComVariant vIndex(i);
+				CComPtr<IDispatch> spDisp;
+				hr = spShellWindows->Item(vIndex, &spDisp);
+				if (hr == S_OK) {
+					CComPtr<IShellBrowser> spShellBrowser;
+					hr = IUnknown_QueryService(spDisp, SID_STopLevelBrowser, IID_IShellBrowser, (void**)&spShellBrowser);
+					if (SUCCEEDED(hr)) {
+						LPITEMIDLIST pidl = GetCurIDList(spShellBrowser);
+						if (pidl) {
+							std::wstring folderPath = GetFullPathFromIDList(pidl);
+							::ILFree(pidl);
+
+							return folderPath;
+						}
+					}
+				}
+			}
+		}
+		return boost::none;
+	};
+	
+	::CoInitialize(NULL);
+	auto folderPath = funcGetExplorerFolder();
+	::CoUninitialize();
+
+	return folderPath;
+}
+
 /// ファイルダイアログの現在のフォルダを取得する
 boost::optional<std::wstring>	GetDlgCurrentFolder(HWND hDlgWnd)
 {
@@ -549,50 +589,11 @@ BOOL InitFileDialog( HWND hWnd )
 
 	g_Shared->cDialog++;
 
-#if 1
-	if (!(::GetAsyncKeyState(VK_CONTROL) < 0)) {
-
-		::CoInitialize(NULL);
-		{
-			CComPtr<IShellWindows> spShellWindows;
-			HRESULT hr = ::CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_ALL, IID_IShellWindows, (void**)&spShellWindows);
-
-			long count = 0;
-			spShellWindows->get_Count(&count);
-			for (long i = 0; i < count; ++i) {
-				CComVariant vIndex(i);
-				CComPtr<IDispatch> spDisp;
-				hr = spShellWindows->Item(vIndex, &spDisp);
-				if (hr == S_OK) {
-					CComPtr<IShellBrowser> spShellBrowser;
-					hr = IUnknown_QueryService(spDisp, SID_STopLevelBrowser, IID_IShellBrowser, (void**)&spShellBrowser);
-					if (SUCCEEDED(hr)) {
-						LPITEMIDLIST pidl = GetCurIDList(spShellBrowser);
-						if (pidl) {
-							std::wstring folderPath = GetFullPathFromIDList(pidl);
-							::ILFree(pidl);
-
-							SetDlgCurrentFolder(hWnd, folderPath.c_str());
-							break;
-						}
-					}
-				}
-			}
+	if (g_Shared->bExplorerFolderOpenOnActive) {
+		if (auto folderPath = GetExplorerFolderPath()) {
+			SetDlgCurrentFolder(hWnd, folderPath->c_str());
 		}
-		::CoUninitialize();
-#if 0
-		//ExplorerPathToFileDlg();
-		IShellBrowser* shellBrowser = (IShellBrowser*)::SendMessage(hWnd, WM_USER + 7, 0, 0);
-		if (shellBrowser) {
-			PIDLIST_ABSOLUTE pidl = nullptr;
-			DWORD attr = 0;
-			HRESULT hr = ::SHILCreateFromPath(L"F:\\アプリケーション", &pidl, &attr);
-			hr = shellBrowser->BrowseObject(pidl, SBSP_SAMEBROWSER | SBSP_ABSOLUTE);
-			::ILFree(pidl);
-		}
-#endif
 	}
-#endif
 	return TRUE;
 }
 
@@ -891,8 +892,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 	case WM_ACTIVATE:
 		{
-#if 0
 			BOOL bActive = wParam & 0xFFFF;
+			if (bActive && g_Shared->bExplorerFolderOpenOnActive) {
+				if (auto folderPath = GetExplorerFolderPath()) {
+					SetDlgCurrentFolder(hWnd, folderPath->c_str());
+				}
+			}
+#if 0
 			if (bActive && bFirstOpen && !(::GetAsyncKeyState(VK_CONTROL) < 0))
 				ExplorerPathToFileDlg();
 			bFirstOpen = false;
@@ -935,6 +941,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 				else if( ID_TOOL_FIRST <= wID && wID < ID_TOOL_FIRST + TOOL_MAX )
 				{
+					std::wstring path = g_Shared->tool.data[wID - ID_TOOL_FIRST].szPath;
+					if (path.find(L"%explorer_open%") != std::wstring::npos) {
+						if (auto folderPath = GetExplorerFolderPath()) {
+							SetDlgCurrentFolder(hWnd, folderPath->c_str());
+						}
+						return 0;
+					}
+
 					std::wstring szParam = g_Shared->tool.data[wID - ID_TOOL_FIRST].szParam;
 					if( StrStr( szParam.c_str(), L"%1" ) != 0 )
 					{ // "%1"を含んでいたら現在のフォルダのパスで置換する。
@@ -1134,7 +1148,7 @@ BOOL Init(void)
 	g_Shared->ListStyle     = GetPrivateProfileInt(L"Setting", L"ListStyle", 0, g_Shared->szIniPath);
 	g_Shared->ListSort      = GetPrivateProfileInt(L"Setting", L"ListSort", 0, g_Shared->szIniPath);
 	g_Shared->bToolbar      = GetPrivateProfileInt(L"Setting", L"Toolbar", 0, g_Shared->szIniPath);
-
+	g_Shared->bExplorerFolderOpenOnActive = GetPrivateProfileInt(L"Setting", L"ExplorerFolderOpenOnActive", 0, g_Shared->szIniPath);
 
 	// 履歴
 	g_Shared->history.count = 0;
