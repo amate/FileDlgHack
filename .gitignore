@@ -26,5 +26,5 @@ obj/
 _ReSharper*/
 ipch/
 /#Release
-
+.vs/
 

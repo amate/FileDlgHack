@@ -9,9 +9,11 @@
 // --------------------------------------------------------
 /* プラグインの名前（２バイトも可能） */
 #ifdef _WIN64
-#define PLUGIN_NAME L"ファイルダイアログ拡張7"
+#define PLUGIN_NAME L"ファイルダイアログ拡張10 x64"
+#define PLUGIN_NAMEW L"ファイルダイアログ拡張10 x64"
 #else
-#define	PLUGIN_NAME	"ファイルダイアログ拡張7"
+#define	PLUGIN_NAME	"ファイルダイアログ拡張10"
+#define	PLUGIN_NAMEW	L"ファイルダイアログ拡張10"
 #endif
 
 /* プラグインのタイプ */
@@ -61,7 +63,7 @@ enum {
 };
 
 /// 共有メモリ名
-#define FILEMAP_SHARED _T("FILEDIALOGEXSHARED")
+#define FILEMAP_SHARED _T("FILEDIALOGEXSHARED_v1")
 
 #define SHORTCUT_MAX 100	// ショートカット
 #define HISTORY_MAX  100	// 履歴
@@ -111,7 +113,8 @@ typedef struct _SHAREDDATA
 	int          ListSort;            // アイコンの整理
 	BOOL         bToolbar;            // ツールバーにアイコンを追加するかどうか
 	BOOL		 bExplorerFolderOpenOnActive;
-	TCHAR        szIniPath[MAX_PATH]; // iniのパス
+	TCHAR        sz86IniPath[MAX_PATH]; // iniのパス
+	TCHAR        szx64IniPath[MAX_PATH]; // iniのパス
 	int          cDialog;             // サブクラス化しているダイアログの数
 	SHORTCUTDATA shortcut;            // ショートカットのデータ
 	HISTORYDATA  history;             // 最近使ったフォルダのデータ

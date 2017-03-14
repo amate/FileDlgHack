@@ -5,6 +5,7 @@
 #include <atlbase.h>
 #include <atlconv.h>
 #include "FileDlgHack.h"
+#include "Config.h"
 
 struct DefviewCmd {
 	TCHAR *szText; // 表示されるテキスト
@@ -136,13 +137,6 @@ const DefviewCmds DefviewCmds[] =
 extern SHAREDDATA *g_Shared;
 extern HINSTANCE  g_Inst;
 
-
-BOOL WritePrivateProfileInt( LPCTSTR lpAppName, LPCTSTR lpKeyName, int value, LPCTSTR lpFileName )
-{
-	TCHAR szbuff[32];
-	wsprintf( szbuff, L"%d", value );
-	return WritePrivateProfileString( lpAppName, lpKeyName, szbuff, lpFileName );
-}
 
 // windowsのバージョンを返す
 int WinVersion()
@@ -379,17 +373,7 @@ BOOL CALLBACK PageProcGENERAL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 			AdjustWinPos( hFileDlg );
 
 			//設定ファイルに書き込み
-			WritePrivateProfileInt( L"Setting", L"Pos"       , g_Shared->nDialogPos , g_Shared->szIniPath );
-			WritePrivateProfileInt( L"Setting", L"PosX"      , g_Shared->DialogPos.x, g_Shared->szIniPath );
-			WritePrivateProfileInt( L"Setting", L"PosY"      , g_Shared->DialogPos.y, g_Shared->szIniPath);
-			WritePrivateProfileInt( L"Setting", L"Size"      , g_Shared->bListSize  , g_Shared->szIniPath);
-			WritePrivateProfileInt( L"Setting", L"SizeX"     , g_Shared->ListSize.x , g_Shared->szIniPath);
-			WritePrivateProfileInt( L"Setting", L"SizeY"     , g_Shared->ListSize.y , g_Shared->szIniPath);
-			WritePrivateProfileInt( L"Setting", L"ListStyle" , g_Shared->ListStyle  , g_Shared->szIniPath);
-			WritePrivateProfileInt( L"Setting", L"ListSort"  , g_Shared->ListSort   , g_Shared->szIniPath);
-			WritePrivateProfileInt( L"Setting", L"MaxHistory", g_Shared->history.max , g_Shared->szIniPath);
-			WritePrivateProfileInt( L"Setting", L"Toolbar"   , g_Shared->bToolbar , g_Shared->szIniPath);
-			WritePrivateProfileInt( L"Setting", L"ExplorerFolderOpenOnActive", g_Shared->bExplorerFolderOpenOnActive, g_Shared->szIniPath);
+			Config::GetInstance().SaveConfig(Config::general);
 
 			return TRUE;
 		}
@@ -561,16 +545,8 @@ BOOL CALLBACK PageProcSHORTCUT( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 				g_Shared->shortcut.data[i] = *(SHORTCUTDATA::ShortcutItem*)SendDlgItemMessage(
 						hWnd, IDC_LIST1, LB_GETITEMDATA, i, 0 );
 
-			//セクションのキーをすべて削除してからiniに書き込む
-			WritePrivateProfileSection( L"Shortcut", L"\0\0", g_Shared->szIniPath );
-			TCHAR szKey[32];
-			for( int i = 0; i < g_Shared->shortcut.count; i++ )
-			{
-				wsprintf( szKey, L"Name%d", i );
-				WritePrivateProfileString( L"Shortcut", szKey, g_Shared->shortcut.data[i].szName, g_Shared->szIniPath );
-				wsprintf( szKey, L"Path%d", i );
-				WritePrivateProfileString( L"Shortcut", szKey, g_Shared->shortcut.data[i].szPath, g_Shared->szIniPath );
-			}
+			// 保存
+			Config::GetInstance().SaveConfig(Config::shortcut);
 		}
 		return TRUE;
 
@@ -818,18 +794,8 @@ BOOL CALLBACK PageProcTOOL( HWND hWnd, UINT msg, WPARAM wp, LPARAM lp )
 				g_Shared->tool.data[i] = *(TOOLDATA::ToolItem*)SendDlgItemMessage(
 						hWnd, IDC_LIST1, LB_GETITEMDATA, i, 0 );
 
-			//セクションのキーをすべて削除してからiniに書き込む
-			WritePrivateProfileSection( L"Tool", L"\0\0", g_Shared->szIniPath );
-			TCHAR szKey[32];
-			for( int i = 0; i < g_Shared->tool.count; i++ )
-			{
-				wsprintf( szKey, L"Name%d", i );
-				WritePrivateProfileString( L"Tool", szKey, g_Shared->tool.data[i].szName, g_Shared->szIniPath );
-				wsprintf( szKey, L"Path%d", i );
-				WritePrivateProfileString( L"Tool", szKey, g_Shared->tool.data[i].szPath, g_Shared->szIniPath );
-				wsprintf( szKey, L"Param%d", i );
-				WritePrivateProfileString( L"Tool", szKey, g_Shared->tool.data[i].szParam, g_Shared->szIniPath );
-			}
+			// 保存
+			Config::GetInstance().SaveConfig(Config::tool);
 		}
 		return TRUE;
 

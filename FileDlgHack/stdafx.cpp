@@ -27,13 +27,13 @@ void DebugTrace(const char *str)
 */
 
 #include "FileDlgHack.h"
+#include "Config.h"
 
 void LogFilePath(TCHAR* path)
 {
-	static TCHAR LogPath[MAX_PATH] = L"\0";
+	static TCHAR LogPath[MAX_PATH] = L"";
 	if (LogPath[0] == L'\0') {
-		lstrcpy(LogPath, g_Shared->szIniPath);
-		int len = lstrlen(LogPath);
+		int len = GetModuleFileName(g_Inst, LogPath, MAX_PATH);
 	 	LogPath[len - 3] = L'l';
 	 	LogPath[len - 2] = L'o';
 		LogPath[len - 1] = L'g';

@@ -16,6 +16,9 @@ BOOL WINAPI DllMain (HINSTANCE hInstance, DWORD fdwReason, LPVOID lpvReserved)
       g_hShared = CreateFileMapping( INVALID_HANDLE_VALUE  , NULL ,
                                      PAGE_READWRITE , 0 , sizeof( SHAREDDATA ) , FILEMAP_SHARED );
       g_Shared = (SHAREDDATA*)MapViewOfFile( g_hShared , FILE_MAP_WRITE , 0 , 0 , 0);
+	  if (GetLastError() != ERROR_ALREADY_EXISTS) {
+		  ::SecureZeroMemory((PVOID)g_Shared, sizeof(SHAREDDATA));
+	  }
       break;
 
     case DLL_PROCESS_DETACH:
